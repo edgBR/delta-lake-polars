@@ -1,3 +1,22 @@
+[tool.poetry]
+name = "delta-lake-demo"
+version = "0.1.0"
+description = ""
+authors = ["Edgar Bahilo edgar-bahilo@b2impact.com"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+black = "^23.11.0"
+ruff = "^0.1.6"
+pytest = "^7.4.3"
+pre-commit = "^3.5.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.black]
 skip-string-normalization = true
 line-length = 120
