@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -7,6 +8,7 @@ import polars as pl
 import requests
 from azure.identity import AzureCliCredential
 from azure.storage.filedatalake import DataLakeServiceClient
+from deltalake import DeltaTable
 from dotenv import load_dotenv
 
 load_dotenv('../.env')
@@ -59,12 +61,12 @@ class ETLPipeline:
                 # Assuming there is only one file in the zip archive
                 file_name = zip_ref.namelist()[0]
                 # Read the CSV file into a polars dataframe
-                df = pl.read_csv(zip_ref.open(file_name).read())
+                raw_df = pl.read_csv(zip_ref.open(file_name).read())
 
                 # Save the DataFrame as a parquet file in blob
                 file_name = f"{file_name.lower().split('.csv')[0]}.parquet"
                 path_name = f"../data/input/{file_name}"
-                df.write_parquet(path_name, use_pyarrow=True, compression='lz4')
+                raw_df.write_parquet(path_name, use_pyarrow=True, compression='lz4')
 
                 file_client = self.bronze_client.get_file_client(file_name)
 
@@ -85,18 +87,69 @@ class ETLPipeline:
             df = pl.read_parquet(
                 source=f'abfs://{LANDING_ZONE_PATH}/{self.file_name}', storage_options=storage_options_raw
             )
+            df = df.with_columns(insertion_date=datetime.now())
+            # df = df.with_columns([(pl.col("start_time").str.to_datetime().dt.strftime("%Y-%m").alias("monthdate"))])
             logger_normal.info(f"Converting {self.file_name} to delta")
             df.write_delta(
-                target=f'abfs://{BRONZE_CONTAINER}/', mode='append', storage_options=storage_options_raw_delta
+                target=f'abfs://{BRONZE_CONTAINER}/',
+                mode='append',
+                storage_options=storage_options_raw_delta
+                # delta_write_options={"partition_by": ['monthdate']}
             )
-        except Exception:
+            # bronze_df = DeltaTable(
+            #         table_uri=f'abfs://{BRONZE_CONTAINER}/', storage_options=storage_options_raw_delta)
+            # bronze_df.optimize.z_order(['trip_id'])
+        except Exception as e:
+            logger_normal.error(e)
             logger_normal.error(f"Failed to conver to delta {self.file_name}")
 
     def bronze_to_silver(self):
-        return True
+        try:
+            storage_options_raw_delta = {"account_name": ACCOUNT_NAME, "use_azure_cli": "True"}
+            # source
+            bronze_df = pl.read_delta(source=f'abfs://{BRONZE_CONTAINER}/', storage_options=storage_options_raw_delta)
+            # target
+            silver_check = self._table_checker(container=SILVER_CONTAINER, options=storage_options_raw_delta)
+            if silver_check:
+                bronze_df = DeltaTable(
+                    table_uri=f'abfs://{BRONZE_CONTAINER}/', storage_options=storage_options_raw_delta
+                ).to_pyarrow_table()
+                logger_normal.info("Merging new data into silver")
+                silver_df = DeltaTable(
+                    table_uri=f'abfs://{SILVER_CONTAINER}/', storage_options=storage_options_raw_delta
+                )
+                (
+                    silver_df.merge(
+                        source=bronze_df, predicate="""s.trip_id = t.trip_id""", source_alias="s", target_alias="t"
+                    )
+                    .when_matched_update_all()
+                    .when_not_matched_insert_all()
+                    .execute()
+                )
+                silver_df.optimize.z_order(['trip_id'])
+            else:
+                logger_normal.info("Because silver table is empty we save the first bronze file as silver")
+                bronze_df.write_delta(
+                    target=f'abfs://{SILVER_CONTAINER}/', mode='overwrite', storage_options=storage_options_raw_delta
+                )
+
+        except Exception as e:
+            logger_normal.error(e)
+            logger_normal.error(f"Failed to merge {self.file_name}")
 
     def silver_to_gold(self):
         return True
+
+    def _table_checker(self, container, options):
+        try:
+            delta_table = DeltaTable(table_uri=f"abfs://{container}/", storage_options=options)
+            logger_normal.info(f"Delta table version is {delta_table.version()}")
+            table_exist = True
+            logger_normal.info(f"Delta Table Exists in {container}")
+        except Exception as e:
+            logger_normal.error(e)
+            table_exist = False
+        return table_exist
 
 
 if __name__ == "__main__":
@@ -104,3 +157,4 @@ if __name__ == "__main__":
     for uri in DOWNLOAD_URIS:
         etl_workflow.upload_to_landing(uri=uri)
         etl_workflow.raw_to_bronze()
+        etl_workflow.bronze_to_silver()
