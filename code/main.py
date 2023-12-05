@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import datetime
+import time
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv('../.env')
 # Set the logging level for all azure-* libraries
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger('azure')
 logger.setLevel(logging.ERROR)
 logger_normal = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class ETLPipeline:
                 # Save the DataFrame as a parquet file in blob
                 file_name = f"{file_name.lower().split('.csv')[0]}.parquet"
                 path_name = f"../data/input/{file_name}"
-                raw_df.write_parquet(path_name, use_pyarrow=True, compression='lz4')
+                raw_df.write_parquet(path_name, use_pyarrow=True, compression='zstd')
 
                 file_client = self.bronze_client.get_file_client(file_name)
 
@@ -78,6 +78,7 @@ class ETLPipeline:
             logger_normal.error(f"Failed to download {uri}. HTTP error occurred: {e}")
         except Exception as e:
             logger_normal.error(f"An error occurred processing {uri}: {e}")
+            raise e
 
     def raw_to_bronze(self):
         try:
@@ -85,64 +86,67 @@ class ETLPipeline:
             storage_options_raw_delta = {"account_name": ACCOUNT_NAME, "use_azure_cli": "True"}
             logger_normal.info(f"Reading {self.file_name}")
             df = pl.read_parquet(
-                source=f'abfs://{LANDING_ZONE_PATH}/{self.file_name}', storage_options=storage_options_raw
+                source=f'abfss://{LANDING_ZONE_PATH}/{self.file_name}', storage_options=storage_options_raw
             )
-            df = df.with_columns(insertion_date=datetime.now())
+            df = pl.read_parquet(source=f'../data/input/{self.file_name}')
+            # df = df.with_columns(insertion_date=datetime.now())
             # df = df.with_columns([(pl.col("start_time").str.to_datetime().dt.strftime("%Y-%m").alias("monthdate"))])
             logger_normal.info(f"Converting {self.file_name} to delta")
             df.write_delta(
-                target=f'abfs://{BRONZE_CONTAINER}/',
+                target=f'abfss://{BRONZE_CONTAINER}/',
                 mode='append',
                 storage_options=storage_options_raw_delta
                 # delta_write_options={"partition_by": ['monthdate']}
             )
-            # bronze_df = DeltaTable(
-            #         table_uri=f'abfs://{BRONZE_CONTAINER}/', storage_options=storage_options_raw_delta)
-            # bronze_df.optimize.z_order(['trip_id'])
+            logger_normal.info("Optimizing by Z order for bronze table")
+            bronze_df = DeltaTable(table_uri=f'abfs://{BRONZE_CONTAINER}/', storage_options=storage_options_raw_delta)
+            bronze_df.optimize.z_order(['trip_id'])
         except Exception as e:
-            logger_normal.error(e)
             logger_normal.error(f"Failed to conver to delta {self.file_name}")
+            raise e
 
     def bronze_to_silver(self):
         try:
             storage_options_raw_delta = {"account_name": ACCOUNT_NAME, "use_azure_cli": "True"}
+
             # source
-            bronze_df = pl.read_delta(source=f'abfs://{BRONZE_CONTAINER}/', storage_options=storage_options_raw_delta)
+            bronze_df = pl.read_delta(source=f'abfss://{BRONZE_CONTAINER}/', storage_options=storage_options_raw_delta)
             # target
             silver_check = self._table_checker(container=SILVER_CONTAINER, options=storage_options_raw_delta)
             if silver_check:
-                bronze_df = DeltaTable(
-                    table_uri=f'abfs://{BRONZE_CONTAINER}/', storage_options=storage_options_raw_delta
-                ).to_pyarrow_table()
                 logger_normal.info("Merging new data into silver")
                 silver_df = DeltaTable(
-                    table_uri=f'abfs://{SILVER_CONTAINER}/', storage_options=storage_options_raw_delta
+                    table_uri=f'abfss://{SILVER_CONTAINER}/', storage_options=storage_options_raw_delta
                 )
                 (
                     silver_df.merge(
-                        source=bronze_df, predicate="""s.trip_id = t.trip_id""", source_alias="s", target_alias="t"
+                        source=bronze_df.to_arrow(),
+                        predicate="s.trip_id = t.trip_id",
+                        source_alias="s",
+                        target_alias="t",
                     )
                     .when_matched_update_all()
                     .when_not_matched_insert_all()
                     .execute()
                 )
+                logger_normal.info("Optimizing by Z order for silver table")
                 silver_df.optimize.z_order(['trip_id'])
+                logger_normal.info(f'History of operations: {silver_df.get_add_actions().to_pandas()}')
             else:
                 logger_normal.info("Because silver table is empty we save the first bronze file as silver")
                 bronze_df.write_delta(
-                    target=f'abfs://{SILVER_CONTAINER}/', mode='overwrite', storage_options=storage_options_raw_delta
+                    target=f'abfss://{SILVER_CONTAINER}/', mode='append', storage_options=storage_options_raw_delta
                 )
-
         except Exception as e:
-            logger_normal.error(e)
             logger_normal.error(f"Failed to merge {self.file_name}")
+            raise e
 
     def silver_to_gold(self):
         return True
 
     def _table_checker(self, container, options):
         try:
-            delta_table = DeltaTable(table_uri=f"abfs://{container}/", storage_options=options)
+            delta_table = DeltaTable(table_uri=f"abfss://{container}/", storage_options=options)
             logger_normal.info(f"Delta table version is {delta_table.version()}")
             table_exist = True
             logger_normal.info(f"Delta Table Exists in {container}")
@@ -153,8 +157,15 @@ class ETLPipeline:
 
 
 if __name__ == "__main__":
+    t = time.time()
     etl_workflow = ETLPipeline()
     for uri in DOWNLOAD_URIS:
-        etl_workflow.upload_to_landing(uri=uri)
-        etl_workflow.raw_to_bronze()
-        etl_workflow.bronze_to_silver()
+        try:
+            etl_workflow.upload_to_landing(uri=uri)
+            etl_workflow.raw_to_bronze()
+            etl_workflow.bronze_to_silver()
+        except Exception as e:
+            logger_normal.error(e)
+            logger_normal.info("Continuing for next file")
+            pass
+    logger_normal.info(f'Total runtime was {time.time()-t}')
