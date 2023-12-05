@@ -10,7 +10,10 @@ To get started you should perform the following steps:
 1.	Installation of poetry:
     - Ensure you have a python installation (higher than 3.8+) in your system (via miniconda3, anaconda3 or a vanilla one from python.org)
     - Run the following command in a linux computer or in WSL (Windows Subsystem for Linux):
-    ```{bash} curl -sSL https://install.python-poetry.org | python3 - ```
+
+    ```{bash}
+    curl -sSL https://install.python-poetry.org | python3 -
+    ```
     - This will install poetry in the current python environment that you have active. Poetry needs to be separated always from your project environment. If you are using conda or miniconda for your python installation you can install poetry in your base environment. However please ensure that your base environment is clean and only contains minimal dependencies.
 2.	Configuring poetry:
     - Sometimes (specially if you have conda) poetry PATH variable can be overwritten when you run ```conda init bash```.
