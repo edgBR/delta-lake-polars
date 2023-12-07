@@ -21,7 +21,7 @@ To get started you should perform the following steps:
     - If you are in azureML instances please edit your /home/azureuser/.bashrc and add the following path variable and restart your bash shell:
     ![Alt text](image.png)
     - Finally overwrite the global configuration of poetry to always use virtual environments in every project with ```poetry config virtualenvs.in-project true```
-3.	After you have installed poetry successfully you can now clone these repository with git clone git@ssh.dev.azure.com:v3/b2holdingglobal/Data%20and%20Analytics%20-%20Internal/delta-lake-examples. Ensure you have a valid [SSH Key](https://learn.microsoft.com/en-us/azure/devops/repos/git/use-ssh-keys-to-authenticate?view=azure-devops).
+3.	After you have installed poetry successfully you can now clone these repository with git clone git@github.com:edgBR/delta-lake-polars.git. Ensure you have a valid [SSH Key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
 4. Finally execute the following ```poetry install```.
 
 # Build and Test
