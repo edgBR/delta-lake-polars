@@ -29,7 +29,7 @@ DOWNLOAD_URIS = [
 
 LANDING_ZONE_PATH = os.getenv('LANDING_ZONE_PATH')
 ACCOUNT_NAME = os.getenv('STORAGE_ACCOUNT_NAME')
-BRONZE_CONTAINER = os.getenv('STAGING_PATH')
+BRONZE_CONTAINER = os.getenv('APPEND_LAYER')
 SILVER_CONTAINER = os.getenv('HISTORICAL_PATH')
 GOLD_CONTAINER = os.getenv('DW_PATH')
 
@@ -45,7 +45,7 @@ class ETLPipeline:
         self.adlsgen2_client = DataLakeServiceClient(
             account_url=f"https://{ACCOUNT_NAME}.dfs.core.windows.net/", credential=AzureCliCredential()
         )
-        self.bronze_client = self.adlsgen2_client.get_directory_client(file_system=LANDING_ZONE_PATH, directory='/')
+        self.landing_client = self.adlsgen2_client.get_directory_client(file_system=LANDING_ZONE_PATH, directory='/')
 
     def upload_to_landing(self, uri: str):
         """_summary_
@@ -68,7 +68,7 @@ class ETLPipeline:
                 path_name = f"../data/input/{file_name}"
                 raw_df.write_parquet(path_name, use_pyarrow=True, compression='zstd')
 
-                file_client = self.bronze_client.get_file_client(file_name)
+                file_client = self.landing_client.get_file_client(file_name)
 
                 with open(file=path_name, mode="rb") as data:
                     file_client.upload_data(data, overwrite=True)
