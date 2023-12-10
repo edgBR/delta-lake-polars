@@ -47,7 +47,7 @@ shape: (4, 5)
 │ 1002           ┆ car        ┆ 2023-01-10 00:00:00 ┆ 32000.0     ┆ false            │
 │ 1003           ┆ motorcycle ┆ 2023-02-01 00:00:00 ┆ 9000.0      ┆ true             │
 ```
-To run the [poor's man datalake demo](https://www.edgarbahilo.com/poors-man-data-lake-with-polars-deltalake/) run:
+To run the [poor man's datalake demo](https://www.edgarbahilo.com/poor-mans-data-lake-with-polars-deltalake/) run:
 ```{bash}
 cd code
 poetry run python -m main
