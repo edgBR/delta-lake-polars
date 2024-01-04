@@ -74,6 +74,10 @@ ignore = [
     "C901",  # too complex
 ]
 
+[tool.ruff.lint.pydocstyle]
+# Use numpy docstrings
+convention = "numpy"
+
 [tool.ruff.isort]
 order-by-type = true
 relative-imports-order = "closest-to-furthest"
