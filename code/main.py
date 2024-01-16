@@ -1,4 +1,4 @@
-import logging
+import logging  # noqa: D100
 import os
 import time
 from io import BytesIO
@@ -35,8 +35,8 @@ GOLD_CONTAINER = os.getenv('DW_PATH')
 
 
 class ETLPipeline:
-    """
-    Mock class that simulates a modulith to process from landing to bronze, silver and gold.
+    """Mock class that simulates a modulith to process from landing to bronze, silver and gold.
+
     It takes the assumption that we process one file at a time for simplification (mostly because
     I did not want to write asyncio calls and deal with the connections in the ADLSGenClient)
     """
@@ -48,14 +48,13 @@ class ETLPipeline:
         self.landing_client = self.adlsgen2_client.get_directory_client(file_system=LANDING_ZONE_PATH, directory='/')
 
     def upload_to_landing(self, uri: str):
-        """_summary_
+        """Uploads the data to the landing zone.
 
         Args:
             uri (str): _description_
         """
-
         try:
-            response = requests.get(url=uri)
+            response = requests.get(url=uri, timeout=120)
             response.raise_for_status()
             with ZipFile(BytesIO(response.content), 'r') as zip_ref:
                 # Assuming there is only one file in the zip archive
@@ -81,6 +80,7 @@ class ETLPipeline:
             raise e
 
     def raw_to_bronze(self):
+        """Append the data from the raw landing zone to the bronze layer."""
         try:
             storage_options_raw = {"account_name": ACCOUNT_NAME, "anon": False}
             storage_options_raw_delta = {"account_name": ACCOUNT_NAME, "use_azure_cli": "True"}
@@ -106,6 +106,7 @@ class ETLPipeline:
             raise e
 
     def bronze_to_silver(self):
+        """Merge the data incrementally and into the silver table."""
         try:
             storage_options_raw_delta = {"account_name": ACCOUNT_NAME, "use_azure_cli": "True"}
 
@@ -142,9 +143,11 @@ class ETLPipeline:
             raise e
 
     def silver_to_gold(self):
+        """Aggregate the data in gold tables."""
         return True
 
     def _table_checker(self, container, options):
+        """Internal method to check if the delta table exists."""
         try:
             delta_table = DeltaTable(table_uri=f"abfss://{container}/", storage_options=options)
             logger_normal.info(f"Delta table version is {delta_table.version()}")
