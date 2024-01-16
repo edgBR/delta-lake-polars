@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime  # noqa: D100
 
 import polars as pl
 from deltalake import DeltaTable
@@ -23,7 +23,7 @@ def execute():
     )
     print(df)
 
-    df.write_delta("/tmp/sales_orders", mode="append")
+    df.write_delta("/tmp/sales_orders", mode="append")  # noqa: S108
 
     new_data = pl.DataFrame(
         {
@@ -35,7 +35,7 @@ def execute():
         }
     )
 
-    dt = DeltaTable("/tmp/sales_orders")
+    dt = DeltaTable("/tmp/sales_orders")  # noqa: S108
     source = new_data.to_arrow()
     delta_schema = _convert_pa_schema_to_delta(source.schema)
     source = source.cast(delta_schema)
