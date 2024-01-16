@@ -36,6 +36,10 @@ line-length = 120
 [tool.ruff]
 # Same as Black.
 line-length = 120
+indent-width = 4
+
+# Assume Python 3.10
+target-version = "py310"
 
 exclude = [
     "jupyter_notebook_config.py",
@@ -61,18 +65,38 @@ exclude = [
     "node_modules",
     "venv"]
 
+extend-include = ["*.ipynb"]
+
+# Same as Black.
+line-length = 120
+indent-width = 4
+
+# Assume Python 3.10
+target-version = "py310"
+
 select = [
     "E",  # pycodestyle errors (settings from FastAPI, thanks, @tiangolo!)
+    "D",  # pydocstyle errors
     "W",  # pycodestyle warnings
     "F",  # pyflakes
     "I",  # isort
     "C",  # flake8-comprehensions
     "B",  # flake8-bugbear
+    "N",  # PEP8 naming
+    "S",  # Bandit
+    "PL", # Pylint
 ]
 ignore = [
     "E501",  # line too long, handled by black
     "C901",  # too complex
+    "D401", # not important for us
+    "D104", # not important for us (yet)
 ]
+
+fixable = ["ALL"]
+unfixable = []
+
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.pydocstyle]
 # Use numpy docstrings
@@ -84,3 +108,28 @@ relative-imports-order = "closest-to-furthest"
 extra-standard-library = ["typing"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 known-first-party = []
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+# Enable auto-formatting of code examples in docstrings. Markdown,
+# reStructuredText code/literal blocks and doctests are all supported.
+# This is currently disabled by default, but it is planned for this
+# to be opt-out in the future.
+docstring-code-format = false
+# Set the line length limit used when formatting code snippets in
+# docstrings.
+# This only has an effect when the `docstring-code-format` setting is
+# enabled.
+docstring-code-line-length = 120
+
+[tool.ruff.per-file-ignores]
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+"__init__.py" = ["E402"]
+"path/to/file.py" = ["E402"]
