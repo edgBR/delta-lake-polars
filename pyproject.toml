@@ -66,11 +66,6 @@ exclude = [
     "venv"]
 
 extend-include = ["*.ipynb"]
-
-# Same as Black.
-line-length = 120
-indent-width = 4
-
 select = [
     "E",  # pycodestyle errors (settings from FastAPI, thanks, @tiangolo!)
     "D",  # pydocstyle errors
