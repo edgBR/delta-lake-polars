@@ -6,6 +6,7 @@ from polars.io.delta import _convert_pa_schema_to_delta
 
 
 def execute():
+    """Executes the dummy processing pipeline."""
     df = pl.DataFrame(
         {
             "sales_order_id": ["1000", "1001", "1002", "1003"],
