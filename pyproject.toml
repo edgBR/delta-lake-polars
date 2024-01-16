@@ -71,9 +71,6 @@ extend-include = ["*.ipynb"]
 line-length = 120
 indent-width = 4
 
-# Assume Python 3.10
-target-version = "py310"
-
 select = [
     "E",  # pycodestyle errors (settings from FastAPI, thanks, @tiangolo!)
     "D",  # pydocstyle errors
