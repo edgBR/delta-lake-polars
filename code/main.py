@@ -1,4 +1,4 @@
-import logging
+import logging  # noqa: D100
 import os
 import time
 from io import BytesIO
@@ -36,7 +36,7 @@ GOLD_CONTAINER = os.getenv('DW_PATH')
 
 class ETLPipeline:
     """Mock class that simulates a modulith to process from landing to bronze, silver and gold.
-    
+
     It takes the assumption that we process one file at a time for simplification (mostly because
     I did not want to write asyncio calls and deal with the connections in the ADLSGenClient)
     """
@@ -53,9 +53,8 @@ class ETLPipeline:
         Args:
             uri (str): _description_
         """
-
         try:
-            response = requests.get(url=uri)
+            response = requests.get(url=uri, timeout=120)
             response.raise_for_status()
             with ZipFile(BytesIO(response.content), 'r') as zip_ref:
                 # Assuming there is only one file in the zip archive
