@@ -39,7 +39,7 @@ line-length = 120
 indent-width = 4
 
 # Assume Python 3.10
-target-version = "py38"
+target-version = "py10"
 
 exclude = [
     "jupyter_notebook_config.py",
